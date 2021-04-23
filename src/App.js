@@ -1,60 +1,115 @@
-import { useState } from "react";
-import Header from "./components/Header"
-import Tasks from "./components/Tasks"
-import AddTask from "./components/AddTask"
+import { useState, useEffect } from "react";
+import { BrowserRouter as Router, Route } from "react-router-dom";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import About from "./components/About";
+import Tasks from "./components/Tasks";
+import AddTask from "./components/AddTask";
 
 function App() {
-  const [formToggle, setFormToggle] = useState(false);
-  const [tasks, setTasks] = useState([
-    {
-        id: 1,
-        text: "Doctors Appointment",
-        day: "Feb 5th at 14:30",
-        reminder: true,
-    },
-    {
-        id: 2,
-        text: "Meeting at school",
-        day: "Feb 6th at 13:00",
-        reminder: true,
-    },
-    {
-        id: 3,
-        text: "Food Shopping",
-        day: "Feb 6th at 15:00",
-        reminder: false,
-    },
-]);
+    const [formToggle, setFormToggle] = useState(false);
+    const [tasks, setTasks] = useState([]);
 
-  const addTask = (task) => {
-    const id = Math.floor(Math.random() * 10000) + 1;
+    useEffect(() => {
+        const getTasks = async () => {
+            const tasksFromServer = await fetchTasks();
+            setTasks(tasksFromServer);
+        };
 
-    const newTask = { id, ...task };
-    setTasks([...tasks, newTask]);
-  };
+        getTasks();
+    }, []);
 
-  // Delete task
-  const deleteTask = (id) => {
-    setTasks(tasks.filter((task) => task.id !== id));
-  };
+    const fetchTasks = async () => {
+        const res = await fetch("http://localhost:5000/tasks");
+        const data = await res.json();
 
-  // Toggle Reminder
-  const toggleReminder = (id) => {
-    setTasks(tasks.map((task) => task.id === id ? { ...task, reminder: !task.reminder } : task))
-  };
+        return data;
+    };
 
-  const toggleForm = () => {
-    setFormToggle(!formToggle);
-  }
+    const fetchTask = async (id) => {
+        const res = await fetch(`http://localhost:5000/tasks/${id}`);
+        const data = await res.json();
 
-  return (
-  <div className="container">
-    <Header addFormToggle={toggleForm} formToggle={formToggle} />
-    {formToggle && <AddTask addTask={addTask} />}
-    {tasks.length > 0 ? <Tasks tasks={tasks} deleteTask={deleteTask} toggleReminder={toggleReminder} /> : <h2>No tasks to display</h2>}
-  </div>
-  );
+        return data;
+    };
+
+    const addTask = async (task) => {
+        const res = await fetch("http://localhost:5000/tasks", {
+            method: "POST",
+            headers: {
+                "Content-type": "application/json",
+            },
+            body: JSON.stringify(task),
+        });
+
+        const data = await res.json();
+
+        setTasks([...tasks, data]);
+    };
+
+    // Delete task
+    const deleteTask = async (id) => {
+        await fetch(`http://localhost:5000/tasks/${id}`, {
+            method: "DELETE",
+        });
+
+        setTasks(tasks.filter((task) => task.id !== id));
+    };
+
+    // Toggle Reminder
+    const toggleReminder = async (id) => {
+        const taskToToggle = await fetchTask(id);
+        const updTask = { ...taskToToggle, reminder: !taskToToggle.reminder };
+
+        const res = await fetch(`http://localhost:5000/tasks/${id}`, {
+            method: "PUT",
+            headers: {
+                "Content-type": "application/json",
+            },
+            body: JSON.stringify(updTask),
+        });
+
+        const data = await res.json();
+
+        setTasks(
+            tasks.map((task) =>
+                task.id === id ? { ...task, reminder: data.reminder } : task
+            )
+        );
+    };
+
+    const toggleForm = () => {
+        setFormToggle(!formToggle);
+    };
+
+    return (
+        <Router>
+            <div className="container">
+                <Header addFormToggle={toggleForm} formToggle={formToggle} />
+
+                <Route
+                    path="/"
+                    exact
+                    render={(props) => (
+                        <>
+                            {formToggle && <AddTask addTask={addTask} />}
+                            {tasks.length > 0 ? (
+                                <Tasks
+                                    tasks={tasks}
+                                    deleteTask={deleteTask}
+                                    toggleReminder={toggleReminder}
+                                />
+                            ) : (
+                                <h2>No tasks to display</h2>
+                            )}
+                        </>
+                    )}
+                />
+                <Route path="/about" component={About} />
+                <Footer />
+            </div>
+        </Router>
+    );
 }
-
 
 export default App;
